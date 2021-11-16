@@ -1,0 +1,8 @@
+type: middleware
+import: gitlab.com/evolves-fr/traefik-plugin-redirect
+displayName: Regex Redirect With Status Code
+summary: The RedirectRegex redirects a request using regex matching and replacement with custom status code
+testData:
+  regex: /redirect
+  replacement: /ok
+  statusCode: 302

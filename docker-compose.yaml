@@ -1,0 +1,54 @@
+version: "3"
+
+networks:
+  traefik-proxy:
+
+services:
+  ######################################################################################################################
+  # Traefik
+  ######################################################################################################################
+  traefik:
+    image: traefik
+    container_name: "traefik"
+    restart: unless-stopped
+    command:
+      - "--log.level=DEBUG"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=traefik-proxy"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.traefik.address=:9000"
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+      - "--experimental.localPlugins.redirect.moduleName=gitlab.com/evolves-fr/traefik-plugin-redirect"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - ".:/plugins-local/src/gitlab.com/evolves-fr/traefik-plugin-redirect"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "9000:9000"
+    networks:
+      - traefik-proxy
+
+  ######################################################################################################################
+  # Traefik
+  ######################################################################################################################
+  whoami:
+    image: traefik/whoami
+    networks:
+      - traefik-proxy
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.whoami.rule=Host(`whoami.local`)"
+      - "traefik.http.routers.whoami.entrypoints=web"
+      - "traefik.http.routers.whoami.middlewares=secured"
+      - "traefik.http.middlewares.secured.chain.middlewares=redirect1,redirect2,redirect3"
+      - "traefik.http.middlewares.redirect1.plugin.redirect.regex=/redirect1$$"
+      - "traefik.http.middlewares.redirect1.plugin.redirect.replacement=/ok1"
+      - "traefik.http.middlewares.redirect2.plugin.redirect.regex=/redirect2$$"
+      - "traefik.http.middlewares.redirect2.plugin.redirect.replacement=/ok2"
+      - "traefik.http.middlewares.redirect2.plugin.redirect.statusCode=308"
+      - "traefik.http.middlewares.redirect3.plugin.redirect.regex=/redirect3$$"
+      - "traefik.http.middlewares.redirect3.plugin.redirect.statusCode=410"
