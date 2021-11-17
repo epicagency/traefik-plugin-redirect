@@ -21,8 +21,8 @@ Into Traefik static configuration
   token = "xxxxxxxxx"
 
 [experimental.plugins]
-  [experimental.plugins.redirect]
-    modulename = "github.com/evolves-fr/traefik-plugin-redirect"
+  [experimental.plugins.traefik-plugin-redirect]
+    moduleName = "github.com/evolves-fr/traefik-plugin-redirect"
     version = "v1.0.0"
 ```
 
@@ -37,17 +37,17 @@ pilot:
 
 experimental:
   plugins:
-    redirect:
-      modulename: github.com/evolves-fr/traefik-plugin-redirect
-      version: v1.0.0
+    traefik-plugin-redirect:
+      moduleName: "github.com/evolves-fr/traefik-plugin-redirect"
+      version: "v1.0.0"
 ```
 
 ### CLI
 ```shell
 --entryPoints.web.address=:80
 --pilot.token=xxxxxxxxx
---experimental.plugins.redirect.modulename=github.com/evolves-fr/traefik-plugin-redirect
---experimental.plugins.redirect.version=v1.0.0
+--experimental.plugins.traefik-plugin-redirect.modulename=github.com/evolves-fr/traefik-plugin-redirect
+--experimental.plugins.traefik-plugin-redirect.version=v1.0.0
 ```
 
 ## Configuration
@@ -72,7 +72,7 @@ metadata:
   name: my-redirect
 spec:
   plugin:
-    redirect:
+    traefik-plugin-redirect:
       redirects:
         - regex: /301
           replacement: /moved-permanently
@@ -83,15 +83,20 @@ spec:
 
 ### TOML
 ```toml
-[http.middlewares]
-  [http.middlewares.my-redirect.plugin.redirect]
-    [[http.middlewares.my-redirect.plugin.redirect.redirects]]
-      regex = "/301"
-      replacement = "/moved-permanently"
-      statusCode = "301"
-    [[http.middlewares.my-redirect.plugin.redirect.redirects]]
-      regex = "/not-found"
-      statusCode = "404"
+[http]
+  [http.middlewares]
+    [http.middlewares.my-redirect]
+      [http.middlewares.my-redirect.plugin]
+        [[http.middlewares.my-redirect.plugin.traefik-plugin-redirect.redirects]]
+          regex = "/redirect"
+          replacement = "/ok"
+          statusCode = "302"
+        [[http.middlewares.my-redirect.plugin.traefik-plugin-redirect.redirects]]
+          regex = "^/gone$"
+          statusCode = "410"
+        [[http.middlewares.my-redirect.plugin.traefik-plugin-redirect.redirects]]
+          regex = "^/not-found$"
+          statusCode = "404"
 ```
 
 ### YAML
@@ -100,7 +105,7 @@ http:
   middlewares:
     my-redirect:
       plugin:
-        redirect:
+        traefik-plugin-redirect:
           redirects:
             - regex: /301
               replacement: /moved-permanently
