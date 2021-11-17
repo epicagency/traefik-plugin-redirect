@@ -13,79 +13,99 @@ const (
 	schemeHTTPS = "https"
 )
 
+// Redirect holds one redirect configuration
+type Redirect struct {
+	Regex       string `json:"regex" yaml:"regex"`
+	Replacement string `json:"replacement" yaml:"replacement"`
+	StatusCode  int    `json:"statusCode" yaml:"statusCode"`
+}
+
 // Config the plugin configuration.
 type Config struct {
-	Regex       string `json:"regex"`
-	Replacement string `json:"replacement"`
-	StatusCode  int    `json:"statusCode"`
+	Redirects []Redirect `json:"redirects,omitempty" yaml:"redirects,omitempty"`
 }
 
 // CreateConfig creates the default plugin configuration.
 func CreateConfig() *Config {
-	return &Config{
-		Regex:       "",
-		Replacement: "",
-		StatusCode:  0,
-	}
+	return &Config{}
 }
 
-// Redirect a plugin.
-type Redirect struct {
-	next        http.Handler
-	name        string
-	regex       *regexp.Regexp
-	replacement string
-	statusCode  int
-	rawURL      func(*http.Request) string
+// Plugin this is a Traefik redirect plugin.
+type Plugin struct {
+	next      http.Handler
+	name      string
+	redirects []redirect
+	rawURL    func(*http.Request) string
+}
+
+type redirect struct {
+	Regex       *regexp.Regexp `json:"regex,omitempty"`
+	Replacement string         `json:"replacement,omitempty"`
+	StatusCode  int            `json:"statusCode,omitempty"`
 }
 
 // New created a new plugin.
 func New(ctx context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
-	rxp, err := regexp.Compile(config.Regex)
-	if err != nil {
-		return nil, err
+	plugin := &Plugin{
+		next:      next,
+		name:      name,
+		redirects: make([]redirect, 0),
+		rawURL:    rawURL,
 	}
 
-	return &Redirect{
-		next:        next,
-		name:        name,
-		regex:       rxp,
-		replacement: config.Replacement,
-		statusCode:  config.StatusCode,
-		rawURL:      rawURL,
-	}, nil
+	for _, cfg := range config.Redirects {
+		rxp, err := regexp.Compile(cfg.Regex)
+		if err != nil {
+			return nil, err
+		}
+
+		plugin.redirects = append(plugin.redirects, redirect{
+			Regex:       rxp,
+			Replacement: cfg.Replacement,
+			StatusCode:  cfg.StatusCode,
+		})
+	}
+
+	return plugin, nil
 }
 
-func (r *Redirect) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	oldURL := r.rawURL(req)
+func (p *Plugin) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	oldURL := p.rawURL(req)
 
-	// If the Regexp doesn't match, skip to the next handler.
-	if !r.regex.MatchString(oldURL) {
-		r.next.ServeHTTP(rw, req)
+	// If no redirection registered, skip to the next handler.
+	if p.redirects == nil || len(p.redirects) == 0 {
+		p.next.ServeHTTP(rw, req)
 		return
 	}
 
-	// Apply a rewrite regexp to the URL.
-	newURL := r.regex.ReplaceAllString(oldURL, r.replacement)
+	// Loop all redirections
+	for _, r := range p.redirects {
+		if r.Regex.MatchString(oldURL) {
+			// Apply a rewrite regexp to the URL.
+			newURL := r.Regex.ReplaceAllString(oldURL, r.Replacement)
 
-	// Parse the rewritten URL and replace request URL with it.
-	parsedURL, err := url.Parse(newURL)
-	if err != nil {
-		r.next.ServeHTTP(rw, req)
-		return
+			// Parse the rewritten URL and replace request URL with it.
+			parsedURL, err := url.Parse(newURL)
+			if err != nil {
+				continue
+			}
+
+			// Check if identical url, and redirect
+			if newURL != oldURL {
+				handler := &moveHandler{location: parsedURL, statusCode: r.StatusCode}
+				handler.ServeHTTP(rw, req)
+				return
+			}
+
+			// Make sure the request URI corresponds the rewritten URL.
+			req.URL = parsedURL
+			req.RequestURI = req.URL.RequestURI()
+			p.next.ServeHTTP(rw, req)
+			return
+		}
 	}
 
-	if newURL != oldURL {
-		handler := &moveHandler{location: parsedURL, statusCode: r.statusCode}
-		handler.ServeHTTP(rw, req)
-		return
-	}
-
-	req.URL = parsedURL
-
-	// Make sure the request URI corresponds the rewritten URL.
-	req.RequestURI = req.URL.RequestURI()
-	r.next.ServeHTTP(rw, req)
+	p.next.ServeHTTP(rw, req)
 }
 
 type moveHandler struct {
