@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -22,6 +23,7 @@ type Redirect struct {
 
 // Config the plugin configuration.
 type Config struct {
+	Debug     bool       `json:"debug,omitempty" yaml:"debug,omitempty"`
 	Redirects []Redirect `json:"redirects,omitempty" yaml:"redirects,omitempty"`
 }
 
@@ -34,6 +36,7 @@ func CreateConfig() *Config {
 type Plugin struct {
 	next      http.Handler
 	name      string
+	debug     bool
 	redirects []redirect
 	rawURL    func(*http.Request) string
 }
@@ -49,6 +52,7 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 	plugin := &Plugin{
 		next:      next,
 		name:      name,
+		debug:     config.Debug,
 		redirects: make([]redirect, 0),
 		rawURL:    rawURL,
 	}
@@ -83,6 +87,16 @@ func (p *Plugin) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		if r.Regex.MatchString(oldURL) {
 			// Apply a rewrite regexp to the URL.
 			newURL := r.Regex.ReplaceAllString(oldURL, r.Replacement)
+
+			// Add headers for debug
+			if p.debug {
+				req.Header.Set("X-Middleware-Name", p.name)
+				req.Header.Set("X-Middleware-Regex", r.Regex.String())
+				req.Header.Set("X-Middleware-Replacement", r.Replacement)
+				req.Header.Set("X-Middleware-StatusCode", strconv.Itoa(r.StatusCode))
+				req.Header.Set("X-Middleware-Old-URL", oldURL)
+				req.Header.Set("X-Middleware-New-URL", newURL)
+			}
 
 			// Parse the rewritten URL and replace request URL with it.
 			parsedURL, err := url.Parse(newURL)

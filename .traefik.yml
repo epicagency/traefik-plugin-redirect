@@ -18,6 +18,7 @@ iconPath: icon.png
 # This is mandatory,
 # and Traefik Pilot will try to execute the plugin with the data you provide as part of its startup validity tests.
 testData:
+  debug: false
   redirects:
     - regex: /redirect
       replacement: /ok
