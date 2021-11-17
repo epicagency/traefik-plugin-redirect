@@ -20,7 +20,7 @@ services:
       - "--entrypoints.traefik.address=:9000"
       - "--api.dashboard=true"
       - "--api.insecure=true"
-      - "--experimental.localPlugins.redirect.moduleName=gitlab.com/evolves-fr/traefik-plugin-redirect"
+      - "--experimental.localPlugins.redirect.moduleName=github.com/evolves-fr/traefik-plugin-redirect"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - ".:/plugins-local/src/gitlab.com/evolves-fr/traefik-plugin-redirect"

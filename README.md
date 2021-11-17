@@ -22,7 +22,7 @@ Into Traefik static configuration
 
 [experimental.plugins]
   [experimental.plugins.redirect]
-    modulename = "gitlab.com/evolves-fr/traefik-plugin-redirect"
+    modulename = "github.com/evolves-fr/traefik-plugin-redirect"
     version = "v1.0.0"
 ```
 
@@ -38,7 +38,7 @@ pilot:
 experimental:
   plugins:
     redirect:
-      modulename: gitlab.com/evolves-fr/traefik-plugin-redirect
+      modulename: github.com/evolves-fr/traefik-plugin-redirect
       version: v1.0.0
 ```
 
@@ -46,7 +46,7 @@ experimental:
 ```shell
 --entryPoints.web.address=:80
 --pilot.token=xxxxxxxxx
---experimental.plugins.redirect.modulename=gitlab.com/evolves-fr/traefik-plugin-redirect
+--experimental.plugins.redirect.modulename=github.com/evolves-fr/traefik-plugin-redirect
 --experimental.plugins.redirect.version=v1.0.0
 ```
 

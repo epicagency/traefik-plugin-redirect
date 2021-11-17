@@ -1,7 +1,22 @@
-type: middleware
-import: gitlab.com/evolves-fr/traefik-plugin-redirect
+# The name of your plugin as displayed in the Traefik Pilot web UI.
 displayName: Regex Redirect With Status Code
-summary: The RedirectRegex redirects a request using regex matching and replacement with custom status code
+
+# For now, `middleware` is the only type available.
+type: middleware
+
+# The import path of your plugin.
+import: github.com/evolves-fr/traefik-plugin-redirect
+
+# A brief description of what your plugin is doing.
+summary: Redirect is a Traefik plugin to redirect a list with status code.
+
+# Medias associated to the plugin (optional)
+iconPath: icon.png
+#bannerPath: banner.png
+
+# Configuration data for your plugin.
+# This is mandatory,
+# and Traefik Pilot will try to execute the plugin with the data you provide as part of its startup validity tests.
 testData:
   redirects:
     - regex: /redirect
