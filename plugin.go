@@ -90,12 +90,12 @@ func (p *Plugin) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 			// Add headers for debug
 			if p.debug {
-				req.Header.Set("X-Middleware-Name", p.name)
-				req.Header.Set("X-Middleware-Regex", r.Regex.String())
-				req.Header.Set("X-Middleware-Replacement", r.Replacement)
-				req.Header.Set("X-Middleware-StatusCode", strconv.Itoa(r.StatusCode))
-				req.Header.Set("X-Middleware-Old-URL", oldURL)
-				req.Header.Set("X-Middleware-New-URL", newURL)
+				rw.Header().Set("X-Middleware-Name", p.name)
+				rw.Header().Set("X-Middleware-Regex", r.Regex.String())
+				rw.Header().Set("X-Middleware-Replacement", r.Replacement)
+				rw.Header().Set("X-Middleware-StatusCode", strconv.Itoa(r.StatusCode))
+				rw.Header().Set("X-Middleware-Old-URL", oldURL)
+				rw.Header().Set("X-Middleware-New-URL", newURL)
 			}
 
 			// Parse the rewritten URL and replace request URL with it.
