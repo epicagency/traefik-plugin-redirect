@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 )
@@ -14,17 +13,10 @@ const (
 	schemeHTTPS = "https"
 )
 
-// Redirect holds one redirect configuration
-type Redirect struct {
-	Regex       string `json:"regex" yaml:"regex"`
-	Replacement string `json:"replacement" yaml:"replacement"`
-	StatusCode  int    `json:"statusCode" yaml:"statusCode"`
-}
-
 // Config the plugin configuration.
 type Config struct {
-	Debug     bool       `json:"debug,omitempty" yaml:"debug,omitempty"`
-	Redirects []Redirect `json:"redirects,omitempty" yaml:"redirects,omitempty"`
+	Debug     bool     `json:"debug,omitempty"     yaml:"debug,omitempty"`
+	Redirects []string `json:"redirects,omitempty" yaml:"redirects,omitempty"`
 }
 
 // CreateConfig creates the default plugin configuration.
@@ -38,13 +30,12 @@ type Plugin struct {
 	name      string
 	debug     bool
 	redirects []redirect
-	rawURL    func(*http.Request) string
 }
 
 type redirect struct {
-	Regex       *regexp.Regexp `json:"regex,omitempty"`
-	Replacement string         `json:"replacement,omitempty"`
-	StatusCode  int            `json:"statusCode,omitempty"`
+	Source      string `json:"source,omitempty"`
+	Destination string `json:"destination,omitempty"`
+	StatusCode  int    `json:"statusCode,omitempty"`
 }
 
 // New created a new plugin.
@@ -54,28 +45,31 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 		name:      name,
 		debug:     config.Debug,
 		redirects: make([]redirect, 0),
-		rawURL:    rawURL,
 	}
 
 	for _, cfg := range config.Redirects {
-		rxp, err := regexp.Compile(cfg.Regex)
-		if err != nil {
-			return nil, err
+		parts := strings.Split(cfg, ":")
+		if len(parts) < 2 {
+			continue
+		}
+		r := redirect{
+			Source:      parts[0],
+			Destination: parts[1],
+			StatusCode:  302,
+		}
+		if len(parts) > 2 {
+			if statusCode, err := strconv.Atoi(parts[2]); err == nil {
+				r.StatusCode = statusCode
+			}
 		}
 
-		plugin.redirects = append(plugin.redirects, redirect{
-			Regex:       rxp,
-			Replacement: cfg.Replacement,
-			StatusCode:  cfg.StatusCode,
-		})
+		plugin.redirects = append(plugin.redirects, r)
 	}
 
 	return plugin, nil
 }
 
 func (p *Plugin) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	oldURL := p.rawURL(req)
-
 	// If no redirection registered, skip to the next handler.
 	if p.redirects == nil || len(p.redirects) == 0 {
 		p.next.ServeHTTP(rw, req)
@@ -84,37 +78,24 @@ func (p *Plugin) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	// Loop all redirections
 	for _, r := range p.redirects {
-		if r.Regex.MatchString(oldURL) {
-			// Apply a rewrite regexp to the URL.
-			newURL := r.Regex.ReplaceAllString(oldURL, r.Replacement)
-
+		if r.Source == req.RequestURI {
 			// Add headers for debug
 			if p.debug {
 				rw.Header().Set("X-Middleware-Name", p.name)
-				rw.Header().Set("X-Middleware-Regex", r.Regex.String())
-				rw.Header().Set("X-Middleware-Replacement", r.Replacement)
+				rw.Header().Set("X-Middleware-Source", r.Source)
+				rw.Header().Set("X-Middleware-Destination", r.Destination)
 				rw.Header().Set("X-Middleware-StatusCode", strconv.Itoa(r.StatusCode))
-				rw.Header().Set("X-Middleware-Old-URL", oldURL)
-				rw.Header().Set("X-Middleware-New-URL", newURL)
+				rw.Header().Set("X-Middleware-Old-URL", req.RequestURI)
 			}
 
-			// Parse the rewritten URL and replace request URL with it.
-			parsedURL, err := url.Parse(newURL)
+			u, err := url.Parse(r.Destination)
 			if err != nil {
 				continue
 			}
 
 			// Check if identical url, and redirect
-			if newURL != oldURL {
-				handler := &moveHandler{location: parsedURL, statusCode: r.StatusCode}
-				handler.ServeHTTP(rw, req)
-				return
-			}
-
-			// Make sure the request URI corresponds the rewritten URL.
-			req.URL = parsedURL
-			req.RequestURI = req.URL.RequestURI()
-			p.next.ServeHTTP(rw, req)
+			handler := &moveHandler{location: u, statusCode: r.StatusCode}
+			handler.ServeHTTP(rw, req)
 			return
 		}
 	}
@@ -147,34 +128,4 @@ func (m *moveHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 	}
-}
-
-func rawURL(req *http.Request) string {
-	scheme := schemeHTTP
-	host := req.Host
-	port := ""
-	uri := req.RequestURI
-
-	schemeRegex := `^(https?):\/\/(\[[\w:.]+\]|[\w\._-]+)?(:\d+)?(.*)$`
-	re, _ := regexp.Compile(schemeRegex)
-	if re.Match([]byte(req.RequestURI)) {
-		match := re.FindStringSubmatch(req.RequestURI)
-		scheme = match[1]
-
-		if len(match[2]) > 0 {
-			host = match[2]
-		}
-
-		if len(match[3]) > 0 {
-			port = match[3]
-		}
-
-		uri = match[4]
-	}
-
-	if req.TLS != nil {
-		scheme = schemeHTTPS
-	}
-
-	return strings.Join([]string{scheme, "://", host, port, uri}, "")
 }

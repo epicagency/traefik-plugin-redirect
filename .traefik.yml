@@ -1,14 +1,14 @@
 # The name of your plugin as displayed in the Traefik Pilot web UI.
-displayName: Regex Redirect With Status Code
+displayName: Fast Redirect With Status Code
 
 # For now, `middleware` is the only type available.
 type: middleware
 
 # The import path of your plugin.
-import: github.com/evolves-fr/traefik-plugin-redirect
+import: github.com/epicagency/traefik-plugin-redirect
 
 # A brief description of what your plugin is doing.
-summary: Redirect is a Traefik plugin to redirect a list with status code.
+summary: Fast Redirect is a Traefik plugin to redirect a list with status code.
 
 # Medias associated to the plugin (optional)
 iconPath: icon.png
@@ -20,10 +20,6 @@ iconPath: icon.png
 testData:
   debug: false
   redirects:
-    - regex: /redirect
-      replacement: /ok
-      statusCode: 302
-    - regex: ^/gone$
-      statusCode: 410
-    - regex: ^/not-found$
-      statusCode: 404
+    - /redirect:/ok:302
+    - /gone::410
+    - /not-found::404
